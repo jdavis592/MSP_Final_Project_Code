@@ -1,0 +1,40 @@
+#include "msp430g2553.h"
+#include "hd44780.h"
+
+uint8_t value = 0;                              // Global value variable for the LCD header file
+int main(void)
+{
+	WDTCTL = WDTPW | WDTHOLD;	                // Stop watch dog timer
+	BCSCTL1 = CALBC1_1MHZ;                      // Set range to a calibrated 1MHz
+	DCOCTL = CALDCO_1MHZ;                       // Set DCO step and modulation to 1MHz
+	P1DIR = 0xFF;                               // Set P1.0 (D0) to P1.7 (D7)
+	P2DIR = (0x01 | 0x02);                      // Set P2.0 (E) and P2.1 (RS) to output
+
+	TA0CCR1 = 32768;                            // Set CCR1 value for 32.678ms interrupt
+	TA0CCTL1 = CCIE;                            // Compare interrupt enable
+	TA0CTL = (TASSEL_2 | MC_2 | TACLR);         // SMCLK, Continuous mode
+
+	__bis_SR_register( GIE );                   // Enable global interrupts
+	hd44780_clear_screen();                     // Clear display content
+
+	while(1)                                    // Endless loop for execution
+	{
+	    hd44780_write_string("Happy Finals! ", 1, 1, NO_CR_LF);
+	    hd44780_output_unsigned_16bit_value(value++, 2, 2, 1, 0);
+	    if(value > 10) {value = 0;}
+	}
+}
+
+// Directs the timer interrupt
+#pragma vector = TIMER0_A1_VECTOR
+__interrupt void timer_0_a1_isr(void)           // Timer 0 A1 interrupt service
+{
+    switch(TA0IV)                               // Determines interrupt source
+    {
+        case 2:                                 // CCR1 caused the interrupt
+        {
+            hd44780_timer_isr();                // Calls HD44780 state machine
+            break;                              //CCR1 interrupt handling is completed
+        }
+    }
+}
